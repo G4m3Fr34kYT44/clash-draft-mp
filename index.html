@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -57,24 +56,46 @@
       border-radius: 6px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.5);
     }
-    #restartBtn {
-      margin-top: 30px;
+    #restartBtn, #leaveLobbyBtn {
+      margin-top: 20px;
       padding: 10px 20px;
       font-size: 1rem;
-      background: #ffc400;
-      color: #1e1e1e;
       border: none;
       border-radius: 8px;
       cursor: pointer;
+    }
+    #restartBtn {
+      background: #ffc400;
+      color: #1e1e1e;
+    }
+    #leaveLobbyBtn {
+      background: #ff4d4d;
+      color: white;
     }
     .card.blacklisted {
       opacity: 0.4;
       border: 2px solid red;
     }
+    #copyLobbyBtn {
+      padding: 4px 10px;
+      font-size: 0.9rem;
+      background: #444;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    #copyLobbyBtn:hover {
+      background: #666;
+    }
   </style>
 </head>
 <body>
   <h1>Clash Royale Draft Multiplayer</h1>
+  <div id="lobbyInfo" style="margin-top: 10px;">
+    <strong>Lobby Code:</strong> <span id="lobbyCode">...</span>
+    <button id="copyLobbyBtn">📋 Copy</button>
+  </div>
   <div id="turn">Loading cards...</div>
   <div class="cards" id="choices"></div>
   <div class="deck-wrapper">
@@ -88,6 +109,7 @@
     </div>
   </div>
   <button id="restartBtn">🔄 Restart Draft</button>
+  <button id="leaveLobbyBtn">🚪 Leave Lobby</button>
 
   <div id="blacklistModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#000000cc; color:white; padding:40px; overflow:auto; z-index:1000;">
     <h2>Select Cards to Blacklist</h2>
@@ -119,7 +141,7 @@
     let lobbyId = localStorage.getItem('lobbyId');
     let myRole = localStorage.getItem('myRole');
 
-    if (!lobbyId) {
+    if (!lobbyId || !myRole) {
       lobbyId = prompt("Enter lobby code or leave blank to create one:");
       if (!lobbyId) {
         lobbyId = Math.random().toString(36).substring(2, 7);
@@ -132,6 +154,24 @@
       localStorage.setItem('myRole', myRole);
     }
 
+    document.getElementById('lobbyCode').textContent = lobbyId;
+    document.getElementById('copyLobbyBtn').onclick = () => {
+      navigator.clipboard.writeText(lobbyId).then(() => {
+        document.getElementById('copyLobbyBtn').textContent = "✅ Copied!";
+        setTimeout(() => {
+          document.getElementById('copyLobbyBtn').textContent = "📋 Copy";
+        }, 1500);
+      });
+    };
+
+    document.getElementById('leaveLobbyBtn').onclick = () => {
+      if (confirm("Are you sure you want to leave the lobby?")) {
+        localStorage.removeItem('lobbyId');
+        localStorage.removeItem('myRole');
+        location.reload();
+      }
+    };
+
     const lobbyRef = doc(db, "lobbies", lobbyId);
     let localState = {};
 
@@ -139,7 +179,7 @@
       headers: { 'Authorization': `Bearer ${apiKey}` }
     })
     .then(res => res.json())
-    .then(data => {
+    .then(async data => {
       const allCards = data.items
         .filter(c => c.elixirCost !== undefined && c.iconUrls?.medium)
         .map(c => ({
@@ -149,6 +189,9 @@
           maxLevel: c.maxLevel,
           elixir: c.elixirCost
         }));
+
+      const snap = await getDoc(lobbyRef);
+      if (snap.exists()) return;
 
       if (myRole === 'player1Deck') {
         const modal = document.getElementById('blacklistModal');
