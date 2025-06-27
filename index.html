@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -181,13 +182,13 @@
     .then(res => res.json())
     .then(async data => {
       const allCards = data.items
-        .filter(c => c.elixirCost !== undefined && c.iconUrls?.medium)
+        .filter(c => c.iconUrls?.medium)
         .map(c => ({
           id: c.id,
           name: c.name,
           icon: c.iconUrls.medium,
           maxLevel: c.maxLevel,
-          elixir: c.elixirCost
+          elixir: c.elixirCost ?? 0
         }));
 
       const snap = await getDoc(lobbyRef);
@@ -198,15 +199,13 @@
         const container = document.getElementById('blacklistChoices');
         modal.style.display = 'block';
 
-        const allCards = data.items
-          .filter(c => c.iconUrls?.medium)
-          .map(c => ({
-            id: c.id,
-            name: c.name,
-            icon: c.iconUrls.medium,
-            maxLevel: c.maxLevel,
-            elixir: c.elixirCost ?? 0  // Default to 0 if undefined
-          }));
+        allCards.forEach(card => {
+          const div = document.createElement('div');
+          div.className = 'card';
+          div.innerHTML = `<img src="${card.icon}" /><div class="card-name">${card.name}</div>`;
+          div.onclick = () => div.classList.toggle('blacklisted');
+          container.appendChild(div);
+        });
 
         document.getElementById('startDraftBtn').onclick = async () => {
           const blacklisted = Array.from(container.querySelectorAll('.card.blacklisted'))
@@ -244,7 +243,7 @@
 
     function updateDecks(game) {
       const sum = arr => arr.reduce((acc, c) => acc + (c.elixir || 0), 0);
-      const render = deck => deck.map(c => `<img src="${c.icon}" title="${c.name} (${c.elixir})" />`).join('');
+      const render = deck => deck.map(c => `<img src="${c.icon}" title="${c.name} (${c.elixir === 0 ? '?' : c.elixir})" />`).join('');
       p1DeckDiv.innerHTML = render(game.player1Deck) + `<div>Elixir: ${sum(game.player1Deck)}</div>`;
       p2DeckDiv.innerHTML = render(game.player2Deck) + `<div>Elixir: ${sum(game.player2Deck)}</div>`;
       if (game.player1Deck.length >= 8 && game.player2Deck.length >= 8) {
@@ -264,7 +263,7 @@
       game.currentPair.forEach((card, i) => {
         const div = document.createElement('div');
         div.className = 'card';
-        div.innerHTML = `<img src="${card.icon}" /><div class="card-name">${card.name} (${card.elixir})</div>`;
+        div.innerHTML = `<img src="${card.icon}" /><div class="card-name">${card.name} (${card.elixir === 0 ? '?' : card.elixir})</div>`;
         if (isMyTurn) {
           div.onclick = () => handlePick(card, game.currentPair[1 - i]);
           div.style.cursor = 'pointer';
@@ -322,13 +321,13 @@
       });
       const data = await res.json();
       const allCards = data.items
-        .filter(c => c.elixirCost !== undefined && c.iconUrls?.medium)
+        .filter(c => c.iconUrls?.medium)
         .map(c => ({
           id: c.id,
           name: c.name,
           icon: c.iconUrls.medium,
           maxLevel: c.maxLevel,
-          elixir: c.elixirCost
+          elixir: c.elixirCost ?? 0
         }));
 
       const snap = await getDoc(lobbyRef);
