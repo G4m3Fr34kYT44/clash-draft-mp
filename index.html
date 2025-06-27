@@ -22,7 +22,6 @@
       background: #2e2e2e;
       padding: 10px;
       border-radius: 10px;
-      cursor: pointer;
       transition: transform 0.2s ease;
     }
     .card:hover {
@@ -57,6 +56,20 @@
       border-radius: 6px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.5);
     }
+    #restartBtn {
+      margin-top: 30px;
+      padding: 10px 20px;
+      font-size: 1rem;
+      background: #ffc400;
+      color: #1e1e1e;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .card.blacklisted {
+      opacity: 0.4;
+      border: 2px solid red;
+    }
   </style>
 </head>
 <body>
@@ -73,13 +86,20 @@
       <div id="p2-deck"></div>
     </div>
   </div>
+  <button id="restartBtn">🔄 Restart Draft</button>
+
+  <div id="blacklistModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#000000cc; color:white; padding:40px; overflow:auto; z-index:1000;">
+    <h2>Select Cards to Blacklist</h2>
+    <div id="blacklistChoices" style="display:flex; flex-wrap:wrap; gap:10px; justify-content:center;"></div>
+    <button id="startDraftBtn" style="margin-top:20px; padding:10px 20px;">Start Draft</button>
+  </div>
 
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
     import { getFirestore, doc, getDoc, setDoc, onSnapshot, updateDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
     const firebaseConfig = {
-      apiKey: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiIsImtpZCI6IjI4YTMxOGY3LTAwMDAtYTFlYi03ZmExLTJjNzQzM2M2Y2NhNSJ9.eyJpc3MiOiJzdXBlcmNlbGwiLCJhdWQiOiJzdXBlcmNlbGw6Z2FtZWFwaSIsImp0aSI6IjA0MDhjNWI3LWY2M2QtNDhkNy1iZGFmLWVhMjFiN2NhZTQzMyIsImlhdCI6MTc1MDYwMDY1NSwic3ViIjoiZGV2ZWxvcGVyLzYxNzJhZWZhLTczMTctM2E0Ny1hMTg5LTA1MGM4OGI1OWQ4MyIsInNjb3BlcyI6WyJyb3lhbGUiXSwibGltaXRzIjpbeyJ0aWVyIjoiZGV2ZWxvcGVyL3NpbHZlciIsInR5cGUiOiJ0aHJvdHRsaW5nIn0seyJjaWRycyI6WyI0NS43OS4yMTguNzkiLCIxOC4yMjAuMjA4LjEiLCIzLjE0OC4yNTAuMjUyIl0sInR5cGUiOiJjbGllbnQifV19.YYTxR_vaWsCiiPw7QvZcQfHm3vsenFdXpaeI9KEMEpXL_ntmuWhlEuWMwIHdAgN7rdWVszqqqmAzCmYIo-CrrA",
+      apiKey: "YOUR_API_KEY",
       authDomain: "clashroyaldraft.firebaseapp.com",
       projectId: "clashroyaldraft"
     };
@@ -87,7 +107,7 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    const apiKey = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiIsImtpZCI6IjI4YTMxOGY3LTAwMDAtYTFlYi03ZmExLTJjNzQzM2M2Y2NhNSJ9.eyJpc3MiOiJzdXBlcmNlbGwiLCJhdWQiOiJzdXBlcmNlbGw6Z2FtZWFwaSIsImp0aSI6IjA0MDhjNWI3LWY2M2QtNDhkNy1iZGFmLWVhMjFiN2NhZTQzMyIsImlhdCI6MTc1MDYwMDY1NSwic3ViIjoiZGV2ZWxvcGVyLzYxNzJhZWZhLTczMTctM2E0Ny1hMTg5LTA1MGM4OGI1OWQ4MyIsInNjb3BlcyI6WyJyb3lhbGUiXSwibGltaXRzIjpbeyJ0aWVyIjoiZGV2ZWxvcGVyL3NpbHZlciIsInR5cGUiOiJ0aHJvdHRsaW5nIn0seyJjaWRycyI6WyI0NS43OS4yMTguNzkiLCIxOC4yMjAuMjA4LjEiLCIzLjE0OC4yNTAuMjUyIl0sInR5cGUiOiJjbGllbnQifV19.YYTxR_vaWsCiiPw7QvZcQfHm3vsenFdXpaeI9KEMEpXL_ntmuWhlEuWMwIHdAgN7rdWVszqqqmAzCmYIo-CrrA";
+    const apiKey = "YOUR_API_KEY";
     const API_URL = 'https://proxy.royaleapi.dev/v1/cards';
 
     const turnDiv = document.getElementById('turn');
@@ -95,16 +115,20 @@
     const p1DeckDiv = document.getElementById('p1-deck');
     const p2DeckDiv = document.getElementById('p2-deck');
 
-    const username = prompt("Enter your name (Player 1 or Player 2):").trim();
-    let lobbyId = prompt("Enter lobby code or leave blank to create one:");
-    let myRole = 'player1Deck';
+    let lobbyId = localStorage.getItem('lobbyId');
+    let myRole = localStorage.getItem('myRole');
 
     if (!lobbyId) {
-      lobbyId = Math.random().toString(36).substring(2, 7);
-      alert(`Share this lobby ID: ${lobbyId}`);
-      myRole = 'player1Deck';
-    } else {
-      myRole = 'player2Deck';
+      lobbyId = prompt("Enter lobby code or leave blank to create one:");
+      if (!lobbyId) {
+        lobbyId = Math.random().toString(36).substring(2, 7);
+        alert(`Share this lobby ID: ${lobbyId}`);
+        myRole = 'player1Deck';
+      } else {
+        myRole = 'player2Deck';
+      }
+      localStorage.setItem('lobbyId', lobbyId);
+      localStorage.setItem('myRole', myRole);
     }
 
     const lobbyRef = doc(db, "lobbies", lobbyId);
@@ -115,21 +139,45 @@
     })
     .then(res => res.json())
     .then(data => {
-      const pool = shuffle(data.items.map(c => ({
+      const allCards = data.items.map(c => ({
         id: c.id,
         name: c.name,
         icon: c.iconUrls.medium,
-        maxLevel: c.maxLevel
-      })));
+        maxLevel: c.maxLevel,
+        elixir: c.elixirCost
+      }));
+
       if (myRole === 'player1Deck') {
-        setDoc(lobbyRef, {
-          turn: 1,
-          player1Deck: [],
-          player2Deck: [],
-          usedIds: [],
-          currentPair: [pool.pop(), pool.pop()],
-          cardPool: pool
+        const modal = document.getElementById('blacklistModal');
+        const container = document.getElementById('blacklistChoices');
+        modal.style.display = 'block';
+
+        allCards.forEach(card => {
+          const div = document.createElement('div');
+          div.className = 'card';
+          div.innerHTML = `<img src="${card.icon}" /><div class="card-name">${card.name}</div>`;
+          div.onclick = () => div.classList.toggle('blacklisted');
+          container.appendChild(div);
         });
+
+        document.getElementById('startDraftBtn').onclick = async () => {
+          const blacklisted = Array.from(container.querySelectorAll('.card.blacklisted'))
+            .map(div => div.querySelector('.card-name').textContent.trim());
+
+          const pool = shuffle(allCards.filter(c => !blacklisted.includes(c.name)));
+
+          await setDoc(lobbyRef, {
+            turn: 1,
+            player1Deck: [],
+            player2Deck: [],
+            usedIds: [],
+            currentPair: [pool.pop(), pool.pop()],
+            cardPool: pool,
+            blacklist: blacklisted
+          });
+
+          modal.style.display = 'none';
+        };
       }
     });
 
@@ -142,8 +190,10 @@
     });
 
     function updateDecks(game) {
-      p1DeckDiv.innerHTML = game.player1Deck.map(c => `<img src="${c.icon}" title="${c.name}" />`).join('');
-      p2DeckDiv.innerHTML = game.player2Deck.map(c => `<img src="${c.icon}" title="${c.name}" />`).join('');
+      const sum = arr => arr.reduce((acc, c) => acc + (c.elixir || 0), 0);
+      const render = deck => deck.map(c => `<img src="${c.icon}" title="${c.name} (${c.elixir})" />`).join('');
+      p1DeckDiv.innerHTML = render(game.player1Deck) + `<div>Elixir: ${sum(game.player1Deck)}</div>`;
+      p2DeckDiv.innerHTML = render(game.player2Deck) + `<div>Elixir: ${sum(game.player2Deck)}</div>`;
       if (game.player1Deck.length >= 8 && game.player2Deck.length >= 8) {
         turnDiv.textContent = "✅ Draft complete!";
       } else {
@@ -154,16 +204,23 @@
     function updateChoices(game) {
       choicesDiv.innerHTML = '';
       if (game.player1Deck.length >= 8 || game.player2Deck.length >= 8) return;
-      if ((myRole === 'player1Deck' && game.turn % 2 === 1) ||
-          (myRole === 'player2Deck' && game.turn % 2 === 0)) {
-        game.currentPair.forEach((card, i) => {
-          const div = document.createElement('div');
-          div.className = 'card';
-          div.innerHTML = `<img src="${card.icon}" /><div class="card-name">${card.name}</div>`;
+
+      const isMyTurn = (myRole === 'player1Deck' && game.turn % 2 === 1) ||
+                       (myRole === 'player2Deck' && game.turn % 2 === 0);
+
+      game.currentPair.forEach((card, i) => {
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.innerHTML = `<img src="${card.icon}" /><div class="card-name">${card.name} (${card.elixir})</div>`;
+        if (isMyTurn) {
           div.onclick = () => handlePick(card, game.currentPair[1 - i]);
-          choicesDiv.appendChild(div);
-        });
-      }
+          div.style.cursor = 'pointer';
+        } else {
+          div.style.opacity = '0.6';
+          div.style.cursor = 'not-allowed';
+        }
+        choicesDiv.appendChild(div);
+      });
     }
 
     async function handlePick(selected, leftover) {
@@ -199,9 +256,42 @@
       }
       return arr;
     }
+
+    // Restart button logic (host only)
+    const restartBtn = document.getElementById('restartBtn');
+    restartBtn.style.display = myRole === 'player1Deck' ? 'inline-block' : 'none';
+
+    restartBtn.onclick = async () => {
+      if (!confirm("Are you sure you want to restart the draft?")) return;
+
+      const res = await fetch(API_URL, {
+        headers: { 'Authorization': `Bearer ${apiKey}` }
+      });
+      const data = await res.json();
+      const allCards = data.items.map(c => ({
+        id: c.id,
+        name: c.name,
+        icon: c.iconUrls.medium,
+        maxLevel: c.maxLevel,
+        elixir: c.elixirCost
+      }));
+
+      const snap = await getDoc(lobbyRef);
+      const blacklist = snap.exists() ? snap.data().blacklist || [] : [];
+      const pool = shuffle(allCards.filter(c => !blacklist.includes(c.name)));
+
+      await setDoc(lobbyRef, {
+        turn: 1,
+        player1Deck: [],
+        player2Deck: [],
+        usedIds: [],
+        currentPair: [pool.pop(), pool.pop()],
+        cardPool: pool,
+        blacklist
+      });
+
+      location.reload();
+    };
   </script>
 </body>
 </html>
-
-
-
