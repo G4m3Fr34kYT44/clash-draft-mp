@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -139,13 +140,15 @@
     })
     .then(res => res.json())
     .then(data => {
-      const allCards = data.items.map(c => ({
-        id: c.id,
-        name: c.name,
-        icon: c.iconUrls.medium,
-        maxLevel: c.maxLevel,
-        elixir: c.elixirCost
-      }));
+      const allCards = data.items
+        .filter(c => c.elixirCost !== undefined && c.iconUrls?.medium)
+        .map(c => ({
+          id: c.id,
+          name: c.name,
+          icon: c.iconUrls.medium,
+          maxLevel: c.maxLevel,
+          elixir: c.elixirCost
+        }));
 
       if (myRole === 'player1Deck') {
         const modal = document.getElementById('blacklistModal');
@@ -165,6 +168,11 @@
             .map(div => div.querySelector('.card-name').textContent.trim());
 
           const pool = shuffle(allCards.filter(c => !blacklisted.includes(c.name)));
+
+          if (pool.length < 2) {
+            alert("Not enough cards to start the draft. Please blacklist fewer cards.");
+            return;
+          }
 
           await setDoc(lobbyRef, {
             turn: 1,
@@ -268,17 +276,24 @@
         headers: { 'Authorization': `Bearer ${apiKey}` }
       });
       const data = await res.json();
-      const allCards = data.items.map(c => ({
-        id: c.id,
-        name: c.name,
-        icon: c.iconUrls.medium,
-        maxLevel: c.maxLevel,
-        elixir: c.elixirCost
-      }));
+      const allCards = data.items
+        .filter(c => c.elixirCost !== undefined && c.iconUrls?.medium)
+        .map(c => ({
+          id: c.id,
+          name: c.name,
+          icon: c.iconUrls.medium,
+          maxLevel: c.maxLevel,
+          elixir: c.elixirCost
+        }));
 
       const snap = await getDoc(lobbyRef);
       const blacklist = snap.exists() ? snap.data().blacklist || [] : [];
       const pool = shuffle(allCards.filter(c => !blacklist.includes(c.name)));
+
+      if (pool.length < 2) {
+        alert("Not enough cards to restart the draft. Please reduce the blacklist.");
+        return;
+      }
 
       await setDoc(lobbyRef, {
         turn: 1,
